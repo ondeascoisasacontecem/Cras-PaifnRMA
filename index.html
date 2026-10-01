@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Protótipo de organização de acompanhamento familiar do PAIF para uso individual." />
+  <title>PAIF - CRAS Cristiana v5</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    :root{
+      --bg:#f4f7fb; --card:#fff; --text:#15233f; --muted:#69758d; --line:#e4eaf2;
+      --blue:#155eef; --blue-50:#eef4ff; --green:#169b62; --green-50:#ebf8f2;
+      --yellow:#d99a00; --yellow-50:#fff7dd; --orange:#f06b1b; --orange-50:#fff0e7;
+      --red:#d92d20; --red-50:#fff0ee; --purple:#7c3aed; --purple-50:#f3efff;
+      --pink:#c026d3; --pink-50:#fdf0ff; --gray:#7f8aa3; --gray-50:#f3f5f8; --shadow:0 10px 30px rgba(21,35,63,.08);
+      --radius:16px;
+    }
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    button,input,select,textarea{font:inherit} button{cursor:pointer}
+    .app{min-height:100vh;display:grid;grid-template-columns:74px 1fr}
+    .rail{position:sticky;top:0;height:100vh;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:18px 10px;z-index:10}
+    .avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#eaf1ff,#d8e6ff);font-weight:800;color:var(--blue);border:1px solid #dce7fa}
+    .rail-name{font-size:10px;text-align:center;margin-top:8px;font-weight:700}.rail-role{font-size:9px;color:var(--muted);text-align:center;margin-top:2px}.online{font-size:9px;color:var(--green);margin:8px 0 16px}
+    .rail-nav{display:flex;flex-direction:column;gap:10px;width:100%;align-items:center}.rail-btn{width:42px;height:42px;border:0;border-radius:12px;background:transparent;color:#53627c;font-size:19px;display:grid;place-items:center;position:relative;transition:.16s ease}.rail-btn:hover{background:#f5f7fb;color:#273956}.rail-btn.active{background:var(--blue-50);color:var(--blue);box-shadow:inset 3px 0 0 var(--blue)}.rail-btn.active::after{content:attr(data-label);position:absolute;left:50px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:800;white-space:nowrap;background:#172b4d;color:#fff;padding:6px 9px;border-radius:8px;box-shadow:0 8px 22px rgba(21,35,63,.18);pointer-events:none}
+    .rail-spacer{flex:1}.rail-exit{border:0;background:transparent;color:#6b7891;font-size:12px}
+    .shell{min-width:0}.header{height:76px;background:#fff;border-bottom:1px solid var(--line);display:grid;grid-template-columns:auto minmax(260px,1fr) auto;align-items:center;gap:20px;padding:0 26px;position:sticky;top:0;z-index:9}
+    .title{font-size:21px;font-weight:800;white-space:nowrap}.search{position:relative;max-width:600px;width:100%;justify-self:center}.search input{width:100%;height:43px;border:1px solid #dce3ed;border-radius:12px;padding:0 42px 0 42px;background:#fbfcfe;outline:none}.search input:focus{border-color:#93b4ff;box-shadow:0 0 0 3px rgba(21,94,239,.09)}.search .mag{position:absolute;left:14px;top:10px;color:#68758b}.search kbd{position:absolute;right:12px;top:10px;border:1px solid #dce3ed;border-radius:7px;padding:2px 7px;background:#fff;color:#8b96aa;font-size:11px}
+    .actions{display:flex;gap:10px;align-items:center}.btn{border:1px solid #dbe3ef;background:#fff;color:#24324b;border-radius:11px;padding:10px 14px;font-weight:700;display:inline-flex;align-items:center;gap:8px}.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}.btn.green{color:#147a4e}.btn.icon{width:42px;height:42px;padding:0;justify-content:center;font-size:18px}.btn:hover{filter:brightness(.98)}
+    .institution-bar{background:#f8fbff;border-bottom:1px solid var(--line);padding:9px 26px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:#596780;font-size:11px}.institution-name{font-weight:800;color:#24324b}.institution-sep{color:#b4bdca}.institution-bar a{color:var(--blue);text-decoration:none;font-weight:700}.institution-bar a:hover{text-decoration:underline}.main{padding:18px 22px 30px}.notice{font-size:12px;color:#6d7890;margin:0 0 12px;display:flex;gap:8px;align-items:center}.notice strong{color:#4f5d76}
+    .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.page-head h2{margin:0;font-size:20px}.page-head p{margin:5px 0 0;color:var(--muted);font-size:12px}.kpis{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:12px;margin-bottom:14px}.kpi{background:#fff;border:1px solid var(--line);border-radius:15px;padding:14px 16px;display:grid;grid-template-columns:46px 1fr;gap:12px;align-items:center;min-height:102px}.kpi.actionable{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}.kpi.actionable:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(21,35,63,.08);border-color:#cad5e4}.kicon{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;font-size:21px}.kpi h3{font-size:12px;margin:0;color:#4c5a72;font-weight:700}.kpi strong{display:block;font-size:27px;line-height:1.1;margin-top:5px}.kpi small{color:#8792a6;font-size:10px}.blue .kicon{background:var(--blue-50);color:var(--blue)}.greenK .kicon{background:var(--green-50);color:var(--green)}.purpleK .kicon{background:var(--purple-50);color:var(--purple)}.yellowK .kicon{background:var(--yellow-50);color:var(--yellow)}.orangeK .kicon{background:var(--orange-50);color:var(--orange)}.redK .kicon{background:var(--red-50);color:var(--red)}.pinkK .kicon{background:var(--pink-50);color:var(--pink)}.grayK .kicon{background:var(--gray-50);color:var(--gray)}
+    .workspace{display:grid;grid-template-columns:minmax(0,1fr);gap:0;position:relative}.panel{background:#fff;border:1px solid var(--line);border-radius:15px;box-shadow:0 2px 10px rgba(21,35,63,.03);overflow:hidden}.filters{display:flex;gap:8px;flex-wrap:wrap;padding:13px;border-bottom:1px solid var(--line);align-items:center}.chip{border:1px solid #dde4ee;background:#fff;border-radius:10px;padding:8px 12px;color:#536078;font-size:12px;font-weight:700}.chip.active{border-color:#8eb1ff;color:var(--blue);background:#f7faff}.chip .count{margin-left:5px;color:#8b96aa}.filter-spacer{flex:1}.table-wrap{overflow:auto;max-height:calc(100vh - 300px)}table{width:100%;border-collapse:collapse;min-width:980px}thead th{position:sticky;top:0;background:#fbfcfe;z-index:1;text-align:left;padding:12px 13px;font-size:11px;color:#47556d;border-bottom:1px solid var(--line)}tbody td{padding:12px 13px;border-bottom:1px solid #edf1f6;font-size:12px;color:#34425a}tbody tr{transition:.15s}tbody tr:hover{background:#f9fbff}tbody tr.selected{background:#f4f8ff;outline:1px solid #7ea6ff;outline-offset:-1px}.namecell{font-weight:750;color:#20304e}.status{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.dot{width:8px;height:8px;border-radius:50%;display:inline-block}.s-alerta .dot{background:#e6a300}.s-bloqueio .dot{background:#f26b1d}.s-suspensao .dot{background:#e22f2f}.s-suspensao-temp .dot{background:var(--pink)}.s-ativo .dot{background:#20a66a}.paif-pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:800;background:var(--green-50);color:var(--green)}.paif-pill.off{background:#f1f3f6;color:#7a879a}.e-positive{color:#168e5b}.e-partial{color:#d48b00}.e-neutral{color:#7c899f}.e-worse{color:#d92d20}.empty{padding:40px;text-align:center;color:#7f8ba1}.footerbar{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;color:#7f8ba1;font-size:11px}.indicator-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.indicator-panel{padding:16px}.indicator-panel h3{margin:0 0 12px;font-size:14px}.indicator-list{display:grid;gap:8px}.indicator-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 11px;border:1px solid #e8edf4;border-radius:10px;background:#fbfcfe;font-size:12px}.indicator-row strong{font-size:16px}.legend-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:7px}.dashboard-help{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;color:#5f6d85;font-size:12px;display:flex;gap:10px;align-items:flex-start}.dashboard-help strong{color:#2f3c55}
+    .drawer{position:fixed;right:0;top:76px;width:min(520px,96vw);height:calc(100vh - 76px);background:#fff;border-left:1px solid var(--line);box-shadow:-18px 0 38px rgba(21,35,63,.13);z-index:20;transform:translateX(102%);transition:transform .23s ease;display:flex;flex-direction:column}.drawer.open{transform:translateX(0)}.drawer-head{padding:16px 18px 0;border-bottom:1px solid var(--line)}.drawer-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.drawer-title h2{font-size:19px;margin:0 0 6px}.subline{font-size:10px;color:#66738b}.close{border:0;background:transparent;font-size:21px;color:#67748a}.tabs{display:flex;gap:4px;margin-top:12px;overflow:auto}.tab{border:0;background:transparent;padding:10px 12px;font-size:12px;color:#48566f;font-weight:700;border-bottom:2px solid transparent}.tab.active{color:var(--blue);border-color:var(--blue)}.drawer-body{padding:14px 16px 92px;overflow:auto}.card{border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:12px}.card h3{font-size:13px;margin:0 0 10px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field label{display:block;color:#7b879b;font-size:10px;font-weight:700;margin-bottom:3px}.field div{font-size:12px;line-height:1.45}.mini-table{width:100%;min-width:0}.mini-table th,.mini-table td{font-size:10px;padding:7px 6px}.timeline{display:flex;flex-direction:column;gap:12px}.event{display:grid;grid-template-columns:12px 82px 1fr;gap:7px;align-items:start}.event .marker{width:8px;height:8px;border-radius:50%;background:var(--blue);margin-top:4px}.event time{font-size:9px;color:#7b879b}.event b{font-size:11px}.event p{font-size:10px;color:#6d7890;margin:2px 0 0}.pending-item{border:1px solid var(--line);border-left:3px solid #ffb300;border-radius:10px;padding:10px;margin-bottom:8px}.pending-item.red{border-left-color:var(--red)}.pending-item.done{opacity:.6;border-left-color:var(--green)}.pending-item strong{display:block;font-size:11px}.pending-item small{color:#7c879a}.drawer-actions{position:absolute;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);padding:12px;display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:8px}.drawer-actions .btn{font-size:11px;justify-content:center;padding:10px 8px}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(15,25,44,.38);z-index:40;display:none;align-items:center;justify-content:center;padding:20px}.modal-backdrop.show{display:flex}.modal{background:#fff;border-radius:16px;width:min(620px,96vw);max-height:90vh;overflow:auto;box-shadow:var(--shadow)}.modal-head{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line)}.modal-head h2{font-size:17px;margin:0}.modal-body{padding:16px 18px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.form-group{margin-bottom:12px}.form-group.full{grid-column:1/-1}.form-group label{display:block;font-size:11px;font-weight:700;color:#526079;margin-bottom:5px}.form-group input,.form-group select,.form-group textarea{width:100%;border:1px solid #dbe3ef;border-radius:10px;padding:10px 11px;background:#fff;outline:none}.form-group textarea{min-height:86px;resize:vertical}.modal-foot{display:flex;justify-content:flex-end;gap:9px;padding:14px 18px;border-top:1px solid var(--line)}
+    .toast-wrap{position:fixed;right:18px;bottom:18px;z-index:80;display:flex;flex-direction:column;gap:8px}.toast{background:#15233f;color:#fff;padding:12px 14px;border-radius:11px;box-shadow:var(--shadow);font-size:12px;max-width:360px}.toast.ok{background:#116b47}.toast.warn{background:#8a5a00}.toast.err{background:#9f2520}
+    .badge{font-size:9px;padding:3px 7px;border-radius:999px;font-weight:800;display:inline-block}.badge.alerta{background:var(--yellow-50);color:#a06c00}.badge.bloqueio{background:var(--orange-50);color:#b94b0d}.badge.suspensao{background:var(--red-50);color:#ba2b22}.badge.suspensao-temp{background:var(--pink-50);color:#991aa8}.badge.ativo{background:var(--green-50);color:#137a4e}
+    .muted{color:#7c879a}.linkbtn{border:0;background:transparent;color:var(--blue);font-weight:700;font-size:11px;padding:0}.danger{color:var(--red)!important}.section-title{display:flex;align-items:center;justify-content:space-between;gap:8px}.small-actions{display:flex;gap:6px}.small-btn{border:1px solid #dfe6ef;background:#fff;border-radius:8px;padding:6px 8px;font-size:10px;color:#526079}
+    @media (max-width:1050px){.kpis{grid-template-columns:repeat(2,1fr)}.indicator-panels{grid-template-columns:1fr}.header{grid-template-columns:1fr auto}.search{grid-column:1/-1;grid-row:2;padding-bottom:10px}.header{height:auto;padding-top:12px}.drawer{top:112px;height:calc(100vh - 112px)}.actions .btn span{display:none}.title{font-size:18px}}
+    @media (max-width:700px){.app{grid-template-columns:1fr}.rail{display:none}.main{padding:12px}.kpis{grid-template-columns:1fr 1fr}.kpi{padding:10px;min-height:85px}.header{padding:10px 12px}.title{font-size:16px}.actions{gap:6px}.institution-bar{padding:8px 12px;gap:6px;font-size:10px}.institution-sep{display:none}.drawer{top:105px;width:100vw}.grid2,.form-grid{grid-template-columns:1fr}.drawer-actions{grid-template-columns:1fr}.drawer-body{padding-bottom:150px}.filters{overflow:auto;flex-wrap:nowrap}.chip{white-space:nowrap}}
+
+    .main-view[hidden]{display:none!important}
+    .rma-main{padding-top:18px}.rma-hero{background:linear-gradient(135deg,#eef4ff,#fff);border:1px solid #dbe6fa;border-radius:16px;padding:18px 20px;margin-bottom:14px;display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.rma-hero h2{margin:0 0 5px;font-size:20px}.rma-hero p{margin:0;color:var(--muted);font-size:12px;max-width:760px}.rma-period{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.rma-period label{font-size:10px;color:#68758b;font-weight:800;display:grid;gap:4px}.rma-period select,.rma-period input{height:38px;border:1px solid #dce3ed;border-radius:9px;padding:0 9px;background:#fff;color:var(--text)}
+    .rma-note{background:#fff7dd;border:1px solid #efd890;color:#634d00;border-radius:12px;padding:10px 12px;font-size:11px;margin-bottom:14px}.rma-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-bottom:14px}.rma-card{background:#fff;border:1px solid var(--line);border-radius:15px;padding:16px;box-shadow:0 2px 10px rgba(21,35,63,.03)}.rma-card h3{margin:0 0 4px;font-size:14px}.rma-card .help{margin:0 0 12px;color:var(--muted);font-size:11px}.rma-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.rma-field{display:grid;grid-template-columns:54px 1fr;align-items:center;gap:8px;background:#fafbfd;border:1px solid #e7ecf4;border-radius:10px;padding:8px}.rma-field label{font-size:11px;font-weight:900;color:#40506c}.rma-field input{min-width:0;width:100%;height:34px;border:1px solid #dce3ed;border-radius:8px;padding:0 9px;text-align:right;font-weight:800}.rma-import-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:9px}.rma-textarea{width:100%;min-height:150px;border:1px solid #dce3ed;border-radius:11px;padding:11px;resize:vertical;background:#fbfcfe}.rma-analysis{display:grid;gap:9px}.rma-record{border:1px solid #e4eaf2;border-radius:11px;padding:10px;background:#fbfcfe}.rma-record .record-head{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}.rma-record .record-badge{font-size:9px;font-weight:900;border-radius:999px;padding:4px 7px;background:var(--blue-50);color:var(--blue)}.rma-record pre{white-space:pre-wrap;margin:0;color:#516078;font-family:inherit;font-size:10px;line-height:1.45}.rma-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.rma-source{font-size:10px;color:var(--muted);margin-top:7px}.rma-integration{display:flex;align-items:center;gap:8px;font-size:11px;color:#355d4a;background:#effaf4;border:1px solid #cfeadb;border-radius:10px;padding:9px 11px;margin-bottom:12px}.rma-divider{height:1px;background:var(--line);margin:14px 0}.view-label{font-size:11px;color:var(--muted);font-weight:700;margin-bottom:8px}.source-format{font-size:10px;color:#6f7d95;background:#f3f6fa;border-radius:7px;padding:4px 7px}
+    @media(max-width:980px){.rma-grid{grid-template-columns:1fr}.rma-hero{flex-direction:column}.rail-btn.active::after{display:none}}
+
+  
+
+    /* v6 — Escala tipográfica ampliada para melhor legibilidade */
+    html, body { font-size:16px; }
+    button, input, select, textarea { font: inherit; }
+    .rail-name{font-size:13px}.rail-role,.online{font-size:12px}
+    .rail-btn.active::after{font-size:13px}.rail-exit{font-size:14px}
+    .title{font-size:23px}
+    .search input{font-size:16px}.search kbd{font-size:13px}
+    .btn{font-size:16px}.btn.icon{font-size:19px}
+    .institution-bar{font-size:14px}.notice{font-size:14px}
+    .page-head h2{font-size:22px}.page-head p{font-size:15px}
+    .kpi h3{font-size:15px}.kpi strong{font-size:29px}.kpi small{font-size:13px}
+    .chip{font-size:15px}
+    thead th{font-size:14px}tbody td{font-size:15px}
+    .paif-pill{font-size:13px}.footerbar{font-size:14px}
+    .indicator-panel h3{font-size:17px}.indicator-row{font-size:15px}.indicator-row strong{font-size:18px}
+    .dashboard-help{font-size:15px}
+    .drawer-title h2{font-size:21px}.subline{font-size:13px}
+    .tab{font-size:15px}.card h3{font-size:16px}
+    .field label{font-size:13px}.field div{font-size:15px}
+    .mini-table th,.mini-table td{font-size:13px}
+    .event time{font-size:12px}.event b{font-size:14px}.event p{font-size:13px}
+    .pending-item strong{font-size:14px}.pending-item small{font-size:13px}
+    .drawer-actions .btn{font-size:14px}
+    .modal-head h2{font-size:19px}.form-group label{font-size:14px}
+    .form-group input,.form-group select,.form-group textarea{font-size:16px}
+    .toast{font-size:15px}.badge{font-size:12px}.linkbtn{font-size:14px}.small-btn{font-size:13px}
+    .rma-hero h2{font-size:22px}.rma-hero p{font-size:15px}.rma-period label{font-size:13px}
+    .rma-period select,.rma-period input{font-size:16px}.rma-note{font-size:14px}
+    .rma-card h3{font-size:17px}.rma-card .help{font-size:14px}
+    .rma-field label{font-size:14px}.rma-field input{font-size:16px}
+    .rma-textarea{font-size:16px}.rma-record .record-badge{font-size:12px}.rma-record pre{font-size:13px}
+    .rma-source,.source-format{font-size:13px}.rma-integration,.view-label{font-size:14px}
+    @media (max-width:1050px){.title{font-size:21px}}
+    @media (max-width:700px){.title{font-size:19px}.institution-bar{font-size:13px}}
+
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="avatar" id="avatar">TC</div>
+    <div class="rail-name" id="railName">Técnico CRAS</div>
+    <div class="rail-role" id="railRole">PAIF</div>
+    <div class="online">● Online</div>
+    <nav class="rail-nav" aria-label="Atalhos">
+      <button class="rail-btn active" data-main-view="dashboard" data-label="Dashboard" title="Dashboard" onclick="setMainView('dashboard')">⌂</button>
+      <button class="rail-btn" data-main-view="familias" data-label="Famílias" title="Famílias" onclick="setMainView('familias')">♙</button>
+      <button class="rail-btn" data-main-view="agenda" data-label="Pendências" title="Agenda e pendências" onclick="setMainView('agenda')">◫</button>
+      <button class="rail-btn" data-main-view="stale" data-label="Sem atualização" title="Sem atualização" onclick="setMainView('stale')">♧</button>
+      <button class="rail-btn" data-main-view="indicadores" data-label="Indicadores" title="Indicadores" onclick="setMainView('indicadores')">▥</button>
+      <button class="rail-btn" data-main-view="rma" data-label="RMA" title="Registro Mensal de Atendimentos" onclick="setMainView('rma')">▦</button>
+    </nav>
+    <div class="rail-spacer"></div>
+    <button class="rail-exit" onclick="exportBackup()">⇩ Backup</button>
+  </aside>
+
+  <div class="shell">
+    <header class="header">
+      <div class="title">PAIF - CRAS Cristiana</div>
+      <div class="search" id="globalSearchBox">
+        <span class="mag">⌕</span>
+        <input id="searchInput" autocomplete="off" placeholder="Buscar família, CPF, responsável, endereço..." />
+        <kbd>Ctrl + K</kbd>
+      </div>
+      <div class="actions">
+        <input id="fileInput" type="file" accept=".xlsx,.xls,.csv,.pdf,.txt" hidden />
+        <button class="btn green" id="globalImportBtn" onclick="globalImportAction()">▣ <span id="globalImportLabel">Importar arquivo</span></button>
+        <button class="btn primary" id="newAttendanceBtn" onclick="openAttendanceModal()">＋ <span>Novo atendimento</span></button>
+        <button class="btn icon" title="Configurações" onclick="openSettingsModal()">⚙</button>
+      </div>
+    </header>
+
+    <div class="institution-bar" aria-label="Informações institucionais do CRAS">
+      <span>⌂</span>
+      <span class="institution-name">CRAS Cristiana Vicente Nunes</span>
+      <span class="institution-sep">•</span>
+      <span>Rua Santo Agostinho, 193 - Centenário, Boa Vista - RR, 69312-490</span>
+      <span class="institution-sep">•</span>
+      <span>Fone: <a href="tel:+5595984026617">(95) 98402-6617</a></span>
+    </div>
+
+    <main class="main main-view" id="paifMain">
+      <section id="dashboardSection">
+        <div class="page-head">
+          <div><h2>Dashboard</h2><p>Visão resumida da carteira, do acompanhamento PAIF e das situações de condicionalidade.</p></div>
+        </div>
+        <p class="notice">ⓘ <strong>Painel de organização interna.</strong> Os dados ficam neste navegador e esta versão não substitui o Prontuário SUAS. Clique em um indicador para abrir as famílias correspondentes.</p>
+        <section class="kpis dashboard-kpis" aria-label="Resumo do Dashboard">
+          <article class="kpi blue actionable" onclick="goToFilter('all')"><div class="kicon">♟</div><div><h3>Famílias em acompanhamento</h3><strong id="kpiActive">0</strong><small>Total da carteira</small></div></article>
+          <article class="kpi greenK actionable" onclick="goToFilter('paif')"><div class="kicon">✓</div><div><h3>Em acompanhamento PAIF</h3><strong id="kpiPaif">0</strong><small>Acompanhamento PAIF ativo</small></div></article>
+          <article class="kpi purpleK actionable" onclick="goToFilter('new')"><div class="kicon">▤</div><div><h3>Novas da planilha</h3><strong id="kpiNew">0</strong><small>Última importação</small></div></article>
+          <article class="kpi yellowK actionable" onclick="goToFilter('alert')"><div class="kicon">!</div><div><h3>Alerta</h3><strong id="kpiAlert">0</strong><small>Situação de condicionalidade</small></div></article>
+          <article class="kpi orangeK actionable" onclick="goToFilter('block')"><div class="kicon">▣</div><div><h3>Bloqueio</h3><strong id="kpiBlock">0</strong><small>Situação de condicionalidade</small></div></article>
+          <article class="kpi redK actionable" onclick="goToFilter('suspend')"><div class="kicon">■</div><div><h3>Suspensão</h3><strong id="kpiSuspend">0</strong><small>Situação de condicionalidade</small></div></article>
+          <article class="kpi pinkK actionable" onclick="goToFilter('tempSuspend')"><div class="kicon">◈</div><div><h3>Suspensão Temporária</h3><strong id="kpiTempSuspend">0</strong><small>Ação técnica registrada</small></div></article>
+          <article class="kpi grayK actionable" onclick="goToFilter('stale')"><div class="kicon">◷</div><div><h3>Sem atualização +<span id="staleDaysLabel">60</span> dias</h3><strong id="kpiStale">0</strong><small>Alerta</small></div></article>
+        </section>
+        <div class="dashboard-help"><span>ⓘ</span><div><strong>As situações são contabilizadas separadamente.</strong> Alerta, Bloqueio, Suspensão e Suspensão Temporária não são agrupadas. “Suspensão Temporária” permanece como categoria própria para registrar a ação técnica no acompanhamento.</div></div>
+      </section>
+
+      <section id="familiesSection" hidden>
+        <div class="page-head"><div><h2 id="listViewTitle">Famílias</h2><p id="listViewSubtitle">Consulte, filtre e acompanhe as famílias cadastradas.</p></div></div>
+        <section class="workspace">
+          <div class="panel">
+            <div class="filters" id="filters"></div>
+            <div class="table-wrap">
+              <table aria-label="Famílias cadastradas">
+                <thead><tr><th>Responsável familiar</th><th>Situação do benefício</th><th>PAIF</th><th>Condicionalidade</th><th>Último atendimento</th><th>Evolução</th><th>Próxima ação</th><th></th></tr></thead>
+                <tbody id="familyRows"></tbody>
+              </table>
+              <div class="empty" id="emptyState" hidden>Nenhuma família cadastrada. Importe um arquivo ou adicione o primeiro registro para começar.</div>
+            </div>
+            <div class="footerbar"><span id="resultCount">0 famílias</span><span>Os registros são salvos automaticamente neste navegador.</span></div>
+          </div>
+        </section>
+      </section>
+
+      <section id="indicatorsSection" hidden>
+        <div class="page-head"><div><h2>Indicadores detalhados</h2><p>Distribuição das famílias por situação e acompanhamento, sem agrupar categorias distintas.</p></div></div>
+        <div class="indicator-panels">
+          <div class="panel indicator-panel"><h3>Situações de condicionalidade</h3><div class="indicator-list" id="conditionIndicators"></div></div>
+          <div class="panel indicator-panel"><h3>Acompanhamento</h3><div class="indicator-list" id="followupIndicators"></div></div>
+        </div>
+      </section>
+    </main>
+
+    <main class="main main-view rma-main" id="rmaMain" hidden>
+      <section class="rma-hero">
+        <div>
+          <div class="view-label">Módulo integrado</div>
+          <h2>RMA — Registro Mensal de Atendimentos</h2>
+          <p>Área específica para organizar o RMA dentro do PAIF. O módulo pode reutilizar atendimentos, visitas e movimentações já registradas na carteira, reduzindo retrabalho. Os totais automáticos são sugestões para conferência técnica antes do fechamento mensal.</p>
+        </div>
+        <div class="rma-period">
+          <label>Mês<select id="rmaMonth"><option value="01">Janeiro</option><option value="02">Fevereiro</option><option value="03">Março</option><option value="04">Abril</option><option value="05">Maio</option><option value="06">Junho</option><option value="07">Julho</option><option value="08">Agosto</option><option value="09">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select></label>
+          <label>Ano<input id="rmaYear" type="number" min="2020" max="2100" style="width:90px"></label>
+          <button class="btn primary" onclick="syncRMAFromPAIF()">↻ Sincronizar PAIF</button>
+        </div>
+      </section>
+
+      <div class="rma-note">⚠ <strong>Conferência obrigatória:</strong> o RMA possui regras próprias. A integração usa os registros do PAIF como fonte de apoio, mas não transforma automaticamente toda informação da carteira em indicador oficial sem revisão.</div>
+
+      <section class="kpis rma-kpis" aria-label="Indicadores mensais para o RMA">
+        <article class="kpi blue"><div class="kicon">♟</div><div><h3>Famílias na carteira</h3><strong id="rmaKpiFamilies">0</strong><small>Referência para A.1</small></div></article>
+        <article class="kpi greenK"><div class="kicon">▤</div><div><h3>Atendimentos no mês</h3><strong id="rmaKpiAttendances">0</strong><small>Registros do histórico PAIF</small></div></article>
+        <article class="kpi orangeK"><div class="kicon">⌂</div><div><h3>Visitas domiciliares</h3><strong id="rmaKpiVisits">0</strong><small>Potencial C.6 + C.1</small></div></article>
+        <article class="kpi redK"><div class="kicon">＋</div><div><h3>Novas famílias</h3><strong id="rmaKpiNewFamilies">0</strong><small>Importadas/cadastradas no período</small></div></article>
+      </section>
+
+      <div class="rma-integration">✓ <strong>Integração PAIF ↔ RMA ativa:</strong> os atendimentos registrados na ficha das famílias podem alimentar a pré-análise mensal do RMA. A classificação permanece editável.</div>
+
+      <section class="rma-grid">
+        <article class="rma-card">
+          <h3>Resumo do RMA — valores sugeridos</h3>
+          <p class="help">Campos compartilháveis nesta fase inicial. Você pode corrigir qualquer valor antes de salvar.</p>
+          <div class="rma-form-grid">
+            <div class="rma-field"><label>A.1</label><input id="rmaA1" type="number" min="0" value="0"></div>
+            <div class="rma-field"><label>A.2</label><input id="rmaA2" type="number" min="0" value="0"></div>
+            <div class="rma-field"><label>C.1</label><input id="rmaC1" type="number" min="0" value="0"></div>
+            <div class="rma-field"><label>C.2</label><input id="rmaC2" type="number" min="0" value="0"></div>
+            <div class="rma-field"><label>C.3</label><input id="rmaC3" type="number" min="0" value="0"></div>
+            <div class="rma-field"><label>C.4</label><input id="rmaC4" type="number" min="0" value="0"></div>
+            <div class="rma-field"><label>C.5</label><input id="rmaC5" type="number" min="0" value="0"></div>
+            <div class="rma-field"><label>C.6</label><input id="rmaC6" type="number" min="0" value="0"></div>
+          </div>
+          <div class="rma-source">A.1 = famílias em acompanhamento (referência); A.2 = novas famílias; C.1 = atendimento particularizado; C.2/C.3 = encaminhamentos explícitos para inclusão/atualização do CadÚnico; C.4 = encaminhamento para BPC; C.5 = CREAS; C.6 = visita domiciliar.</div>
+          <div class="rma-actions"><button class="btn primary" onclick="saveRmaMonth()">Salvar mês</button><button class="btn" onclick="exportRmaMonth()">Exportar JSON</button><button class="btn" onclick="window.print()">Imprimir</button></div>
+        </article>
+
+        <article class="rma-card">
+          <h3>Importar registros do mês</h3>
+          <p class="help">O módulo aceita TXT, DOCX ou PDF com texto pesquisável, além de texto colado diretamente.</p>
+          <div class="rma-import-row"><input id="rmaFileInput" type="file" accept=".txt,.docx,.pdf" multiple hidden><button class="btn" onclick="document.getElementById('rmaFileInput').click()">⇧ Selecionar TXT / DOCX / PDF</button><span class="source-format" id="rmaSelectedFiles">Nenhum arquivo selecionado</span></div>
+          <textarea class="rma-textarea" id="rmaManualText" placeholder="Cole aqui registros do mês. Ex.: 05/09/2026 — Realizada visita domiciliar para acompanhamento familiar..."></textarea>
+          <div class="rma-actions"><button class="btn primary" onclick="analyzeRmaSources()">Analisar registros</button><button class="btn" onclick="clearRmaAnalysis()">Limpar análise</button></div>
+          <div class="rma-source">O interpretador usa regras conservadoras: um procedimento registrado sugere C.1; C.2/C.3 só entram quando o encaminhamento ao CadÚnico está explícito.</div>
+        </article>
+      </section>
+
+      <section class="rma-card">
+        <div class="section-title"><div><h3>Conferência da pré-análise</h3><p class="help" style="margin:4px 0 0">Confira as classificações encontradas antes de aplicá-las ao resumo mensal.</p></div><button class="btn" id="rmaApplyBtn" onclick="applyRmaAnalysis()">Aplicar análise ao resumo</button></div>
+        <div class="rma-divider"></div>
+        <div class="rma-analysis" id="rmaAnalysisList"><span class="muted">Nenhuma análise realizada.</span></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<aside class="drawer" id="drawer" aria-label="Ficha da família">
+  <div class="drawer-head">
+    <div class="drawer-title"><div><h2 id="drawerName">Família</h2><div class="subline" id="drawerSub"></div></div><button class="close" onclick="closeDrawer()">×</button></div>
+    <div class="tabs" id="drawerTabs">
+      <button class="tab active" data-tab="dados">Dados</button><button class="tab" data-tab="familia">Família</button><button class="tab" data-tab="historico">Histórico</button><button class="tab" data-tab="plano">Plano</button><button class="tab" data-tab="pendencias">Pendências</button>
+    </div>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+  <div class="drawer-actions">
+    <button class="btn primary" onclick="openAttendanceModal()">▤ Registrar atendimento</button>
+    <button class="btn" onclick="openPendingModal()">◷ Criar pendência</button>
+    <button class="btn" onclick="openEvolutionModal()">⌁ Atualizar evolução</button>
+  </div>
+</aside>
+
+<div class="modal-backdrop" id="modalBackdrop" onclick="backdropClose(event)">
+  <div class="modal" id="modalBox"></div>
+</div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+const STORAGE_KEY='paif_families_v2';
+const SETTINGS_KEY='paif_settings_v1';
+const META_KEY='paif_meta_v2';
+let families=[];
+let settings={name:'Técnico CRAS', role:'PAIF', staleDays:60};
+let meta={lastImportIds:[], lastImportAt:null};
+let activeFilter='all';
+let selectedId=null;
+let drawerTab='dados';
+let mainView='dashboard';
+const RMA_KEY='paif_rma_v1';
+let rmaState={months:{},analysis:[],filesText:'',selectedFiles:[]};
+
+
+function uid(prefix='id'){return prefix+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8)}
+function todayISO(){return new Date().toISOString().slice(0,10)}
+function parseLocalDate(iso){if(!iso)return null;const [y,m,d]=String(iso).slice(0,10).split('-').map(Number);return y&&m&&d?new Date(y,m-1,d):null}
+function formatDate(iso){const d=parseLocalDate(iso);return d?d.toLocaleDateString('pt-BR'):'—'}
+function daysSince(iso){const d=parseLocalDate(iso);if(!d)return 99999;const now=new Date();now.setHours(0,0,0,0);return Math.floor((now-d)/(86400000))}
+function escapeHTML(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c]))}
+function normalizeText(s=''){return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,' ')}
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(families));localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));localStorage.setItem(META_KEY,JSON.stringify(meta));localStorage.setItem(RMA_KEY,JSON.stringify({...rmaState,selectedFiles:[]}))}
+function load(){
+  try{families=JSON.parse(localStorage.getItem(STORAGE_KEY))||[]}catch{families=[]}
+  families=families.map(f=>({...f,paifActive:typeof f.paifActive==='boolean'?f.paifActive:false}));
+  try{settings={...settings,...(JSON.parse(localStorage.getItem(SETTINGS_KEY))||{})}}catch{}
+  try{meta={...meta,...(JSON.parse(localStorage.getItem(META_KEY))||{})}}catch{}
+  try{rmaState={...rmaState,...(JSON.parse(localStorage.getItem(RMA_KEY))||{})}}catch{}
+  if(!localStorage.getItem(STORAGE_KEY))save();
+}
+function isTemporarySuspensionStatus(s=''){const n=normalizeText(s);return (n.includes('susp')&&n.includes('tempor'))||n.includes('interrupcao temporaria')}
+function statusClass(s=''){const n=normalizeText(s);if(isTemporarySuspensionStatus(s))return 's-suspensao-temp';if(n.includes('susp'))return 's-suspensao';if(n.includes('bloq'))return 's-bloqueio';if(n.includes('alert')||n.includes('advert'))return 's-alerta';return 's-ativo'}
+function statusBadge(s=''){const c=statusClass(s).replace('s-','');return `<span class="badge ${c}">${escapeHTML(s||'Não informado')}</span>`}
+function evolutionClass(e=''){const n=normalizeText(e);if(n.includes('posit'))return 'e-positive';if(n.includes('parcial'))return 'e-partial';if(n.includes('agrav'))return 'e-worse';return 'e-neutral'}
+function isPaifFamily(f){return f?.paifActive===true}
+function matchesFilter(f){
+  const n=normalizeText(f.benefitStatus),temp=isTemporarySuspensionStatus(f.benefitStatus);
+  if(activeFilter==='new')return meta.lastImportIds.includes(f.id);
+  if(activeFilter==='paif')return isPaifFamily(f);
+  if(activeFilter==='alert')return n.includes('alert')||n.includes('advert');
+  if(activeFilter==='block')return n.includes('bloq');
+  if(activeFilter==='tempSuspend')return temp;
+  if(activeFilter==='suspend')return n.includes('susp')&&!temp;
+  if(activeFilter==='stale')return daysSince(f.lastAttendance)>Number(settings.staleDays||60);
+  if(activeFilter==='pending')return (f.pending||[]).some(p=>!p.done);
+  return true;
+}
+function searchBlob(f){return normalizeText([f.responsible,f.cpf,f.nis,f.address,f.phone,f.benefit,f.benefitStatus,...(f.members||[]).map(m=>m.name)].join(' '))}
+function filteredFamilies(){const q=normalizeText(document.getElementById('searchInput').value);return families.filter(f=>matchesFilter(f)&&(!q||searchBlob(f).includes(q)))}
+function render(){renderIdentity();renderKPIs();renderFilters();renderTable();renderIndicators();renderMainView();renderRMA();if(selectedId&&families.some(f=>f.id===selectedId)&&['familias','agenda','stale'].includes(mainView))renderDrawer();else closeDrawer(false)}
+function renderIdentity(){document.getElementById('railName').textContent=settings.name||'Técnico CRAS';document.getElementById('railRole').textContent=settings.role||'PAIF';document.getElementById('avatar').textContent=(settings.name||'TC').split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase();document.getElementById('staleDaysLabel').textContent=settings.staleDays||60}
+function statusCounts(){
+  const alert=families.filter(f=>{const n=normalizeText(f.benefitStatus);return n.includes('alert')||n.includes('advert')}).length;
+  const block=families.filter(f=>normalizeText(f.benefitStatus).includes('bloq')).length;
+  const tempSuspend=families.filter(f=>isTemporarySuspensionStatus(f.benefitStatus)).length;
+  const suspend=families.filter(f=>normalizeText(f.benefitStatus).includes('susp')&&!isTemporarySuspensionStatus(f.benefitStatus)).length;
+  return {alert,block,suspend,tempSuspend};
+}
+function renderKPIs(){
+  const c=statusCounts();
+  const stale=families.filter(f=>daysSince(f.lastAttendance)>Number(settings.staleDays||60)).length;
+  document.getElementById('kpiActive').textContent=families.length;
+  document.getElementById('kpiPaif').textContent=families.filter(isPaifFamily).length;
+  document.getElementById('kpiNew').textContent=meta.lastImportIds.length;
+  document.getElementById('kpiAlert').textContent=c.alert;
+  document.getElementById('kpiBlock').textContent=c.block;
+  document.getElementById('kpiSuspend').textContent=c.suspend;
+  document.getElementById('kpiTempSuspend').textContent=c.tempSuspend;
+  document.getElementById('kpiStale').textContent=stale;
+}
+function filterCount(type){const prev=activeFilter;activeFilter=type;const c=families.filter(matchesFilter).length;activeFilter=prev;return c}
+function renderFilters(){
+ const defs=[['all','Todas',families.length],['paif','PAIF',filterCount('paif')],['new','Novas',meta.lastImportIds.length],['alert','Alerta',filterCount('alert')],['block','Bloqueio',filterCount('block')],['suspend','Suspensão',filterCount('suspend')],['tempSuspend','Suspensão Temporária',filterCount('tempSuspend')],['stale',`Sem atendimento +${settings.staleDays}d`,filterCount('stale')],['pending','Com pendência',filterCount('pending')]];
+ document.getElementById('filters').innerHTML=defs.map(([k,l,c])=>`<button class="chip ${activeFilter===k?'active':''}" onclick="setFilter('${k}')">${l}<span class="count">${c}</span></button>`).join('')+`<span class="filter-spacer"></span><button class="chip" onclick="focusSearch()">⌕ Buscar</button>`;
+}
+function renderTable(){
+ const list=filteredFamilies();const tbody=document.getElementById('familyRows');document.getElementById('emptyState').hidden=list.length>0;
+ tbody.innerHTML=list.map(f=>`<tr class="${selectedId===f.id?'selected':''}" onclick="selectFamily('${f.id}')">
+ <td class="namecell">${escapeHTML(f.responsible||'Sem responsável')}</td>
+ <td><span class="status ${statusClass(f.benefitStatus)}"><span class="dot"></span>${escapeHTML(f.benefitStatus||'Não informado')}</span></td>
+ <td><span class="paif-pill ${isPaifFamily(f)?'':'off'}">${isPaifFamily(f)?'✓ PAIF':'— Não'}</span></td>
+ <td>${escapeHTML(f.conditionality||'—')}</td><td>${formatDate(f.lastAttendance)}</td>
+ <td class="${evolutionClass(f.evolution)}">${escapeHTML(f.evolution||'Sem avaliação')}</td>
+ <td><b>${escapeHTML(f.nextAction||'—')}</b><br><span class="muted">${formatDate(f.nextActionDate)}</span></td><td>⋮</td></tr>`).join('');
+ document.getElementById('resultCount').textContent=`Mostrando ${list.length} de ${families.length} famílias`;
+}
+function renderIndicators(){
+ const c=statusCounts(),stale=filterCount('stale'),pending=filterCount('pending'),paif=filterCount('paif');
+ const cond=document.getElementById('conditionIndicators'),follow=document.getElementById('followupIndicators');
+ if(cond)cond.innerHTML=`
+  <div class="indicator-row"><span><i class="legend-dot" style="background:#e6a300"></i>Alerta</span><strong>${c.alert}</strong></div>
+  <div class="indicator-row"><span><i class="legend-dot" style="background:#f26b1d"></i>Bloqueio</span><strong>${c.block}</strong></div>
+  <div class="indicator-row"><span><i class="legend-dot" style="background:#e22f2f"></i>Suspensão</span><strong>${c.suspend}</strong></div>
+  <div class="indicator-row"><span><i class="legend-dot" style="background:var(--pink)"></i>Suspensão Temporária</span><strong>${c.tempSuspend}</strong></div>`;
+ if(follow)follow.innerHTML=`
+  <div class="indicator-row"><span><i class="legend-dot" style="background:var(--blue)"></i>Famílias em acompanhamento</span><strong>${families.length}</strong></div>
+  <div class="indicator-row"><span><i class="legend-dot" style="background:var(--green)"></i>Em acompanhamento PAIF</span><strong>${paif}</strong></div>
+  <div class="indicator-row"><span><i class="legend-dot" style="background:var(--purple)"></i>Novas da última importação</span><strong>${meta.lastImportIds.length}</strong></div>
+  <div class="indicator-row"><span><i class="legend-dot" style="background:var(--gray)"></i>Sem atualização +${settings.staleDays} dias</span><strong>${stale}</strong></div>
+  <div class="indicator-row"><span><i class="legend-dot" style="background:#5973a8"></i>Com pendência aberta</span><strong>${pending}</strong></div>`;
+}
+function setFilter(k){activeFilter=k;mainView='familias';renderMainView();renderFilters();renderTable()}
+function goToFilter(k){activeFilter=k;mainView='familias';render();setTimeout(()=>document.getElementById('familiesSection')?.scrollIntoView({behavior:'smooth',block:'start'}),30)}
+function focusSearch(){if(!['familias','agenda','stale'].includes(mainView))setMainView('familias');document.getElementById('searchInput').focus()}
+function setMainView(view){
+ mainView=view;
+ if(view==='dashboard'){activeFilter='all'}
+ if(view==='familias'){activeFilter='all'}
+ if(view==='agenda'){activeFilter='pending'}
+ if(view==='stale'){activeFilter='stale'}
+ renderMainView();renderFilters();renderTable();renderIndicators();renderRMA();
+ if(view==='familias')setTimeout(()=>document.getElementById('searchInput').focus(),50);
+ if(['dashboard','indicadores','rma'].includes(view))closeDrawer();
+}
+function renderMainView(){
+ const isRma=mainView==='rma',isDashboard=mainView==='dashboard',isIndicators=mainView==='indicadores',isList=['familias','agenda','stale'].includes(mainView);
+ document.getElementById('paifMain').hidden=isRma;document.getElementById('rmaMain').hidden=!isRma;
+ document.getElementById('dashboardSection').hidden=!isDashboard;document.getElementById('familiesSection').hidden=!isList;document.getElementById('indicatorsSection').hidden=!isIndicators;
+ document.querySelectorAll('.rail-btn[data-main-view]').forEach(b=>b.classList.toggle('active',b.dataset.mainView===mainView));
+ const titles={familias:['Famílias','Consulte, filtre e acompanhe as famílias cadastradas.'],agenda:['Pendências','Famílias com pendências abertas e ações que exigem acompanhamento.'],stale:['Sem atualização',`Famílias sem registro de atendimento há mais de ${settings.staleDays} dias.`]};
+ if(isList&&titles[mainView]){document.getElementById('listViewTitle').textContent=titles[mainView][0];document.getElementById('listViewSubtitle').textContent=titles[mainView][1]}
+ const search=document.getElementById('globalSearchBox'),attendance=document.getElementById('newAttendanceBtn'),label=document.getElementById('globalImportLabel');
+ if(search)search.style.visibility=isList?'visible':'hidden';if(attendance)attendance.style.display=isList?'inline-flex':'none';if(label)label.textContent=isRma?'Importar registros':'Importar arquivo';
+}
+function globalImportAction(){if(mainView==='rma')document.getElementById('rmaFileInput').click();else document.getElementById('fileInput').click()}
+
+function selectFamily(id){selectedId=id;drawerTab='dados';document.getElementById('drawer').classList.add('open');renderTable();renderDrawer()}
+function closeDrawer(clear=true){document.getElementById('drawer').classList.remove('open');if(clear){selectedId=null;renderTable()}}
+function selected(){return families.find(f=>f.id===selectedId)}
+function renderDrawer(){
+ const f=selected();if(!f)return;document.getElementById('drawerName').innerHTML=`${escapeHTML(f.responsible)} &nbsp; ${statusBadge(f.benefitStatus)}`;document.getElementById('drawerSub').textContent=`NIS: ${f.nis||'—'}  •  CPF: ${f.cpf||'—'}`;
+ document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===drawerTab));
+ const body=document.getElementById('drawerBody');
+ if(drawerTab==='dados') body.innerHTML=drawerDados(f); if(drawerTab==='familia')body.innerHTML=drawerFamilia(f); if(drawerTab==='historico')body.innerHTML=drawerHistorico(f); if(drawerTab==='plano')body.innerHTML=drawerPlano(f); if(drawerTab==='pendencias')body.innerHTML=drawerPendencias(f);
+}
+function drawerDados(f){return `<div class="card"><div class="grid2">
+ <div class="field"><label>CPF</label><div>${escapeHTML(f.cpf||'—')}</div></div><div class="field"><label>NIS</label><div>${escapeHTML(f.nis||'—')}</div></div>
+ <div class="field"><label>Endereço</label><div>${escapeHTML(f.address||'—')}</div></div><div class="field"><label>Telefone</label><div>${escapeHTML(f.phone||'—')}</div></div>
+ <div class="field"><label>Benefício</label><div>${escapeHTML(f.benefit||'—')}</div></div><div class="field"><label>Situação</label><div>${statusBadge(f.benefitStatus)} <button class="linkbtn" onclick="openStatusModal()">Alterar</button></div></div>
+ <div class="field"><label>Acompanhamento PAIF</label><div><span class="paif-pill ${isPaifFamily(f)?'':'off'}">${isPaifFamily(f)?'✓ Ativo':'— Não ativo'}</span> <button class="linkbtn" onclick="togglePaifSelected()">${isPaifFamily(f)?'Encerrar':'Iniciar'}</button></div></div><div class="field"><label>Último atendimento</label><div>${formatDate(f.lastAttendance)}</div></div><div class="field"><label>Próxima revisão</label><div>${formatDate(f.plan?.nextReview)}</div></div></div></div>
+ ${drawerFamilia(f,true)}<div class="grid2">${drawerHistorico(f,true)}${drawerPlano(f,true)}</div>`}
+function drawerFamilia(f,compact=false){const ms=f.members||[];return `<div class="card"><div class="section-title"><h3>Membros da família (${ms.length})</h3>${compact?'<button class="linkbtn" onclick="setDrawerTab(\'familia\')">Ver todos</button>':''}</div><table class="mini-table"><thead><tr><th>Nome</th><th>Parentesco</th><th>Idade</th><th>Condicionalidade</th></tr></thead><tbody>${ms.map(m=>`<tr><td><b>${escapeHTML(m.name)}</b>${m.note?`<br><span class="danger">${escapeHTML(m.note)}</span>`:''}</td><td>${escapeHTML(m.relation||'—')}</td><td>${escapeHTML(m.age??'—')}</td><td>${escapeHTML(m.conditionality||'—')}</td></tr>`).join('')||'<tr><td colspan="4">Nenhum membro cadastrado.</td></tr>'}</tbody></table>${compact?'':`<div style="margin-top:10px"><button class="small-btn" onclick="openMemberModal()">＋ Adicionar membro</button></div>`}</div>`}
+function drawerHistorico(f,compact=false){const hs=[...(f.history||[])].sort((a,b)=>String(b.date).localeCompare(String(a.date)));return `<div class="card"><div class="section-title"><h3>${compact?'Histórico recente':'Histórico de atendimentos'}</h3>${compact?'<button class="linkbtn" onclick="setDrawerTab(\'historico\')">Ver completo</button>':''}</div><div class="timeline">${hs.slice(0,compact?3:999).map(h=>`<div class="event"><span class="marker"></span><time>${formatDate(h.date)}</time><div><b>${escapeHTML(h.type)}</b><p>${escapeHTML(h.notes||'')}</p></div></div>`).join('')||'<span class="muted">Nenhum atendimento registrado.</span>'}</div></div>`}
+function drawerPlano(f,compact=false){const p=f.plan||{};return `<div class="card"><div class="section-title"><h3>Plano de acompanhamento</h3>${compact?'<button class="linkbtn" onclick="setDrawerTab(\'plano\')">Abrir</button>':''}</div><div class="field"><label>Vulnerabilidade identificada</label><div>${escapeHTML(p.vulnerability||'—')}</div></div><br><div class="field"><label>Objetivo</label><div>${escapeHTML(p.objective||'—')}</div></div><br><div class="field"><label>Ações pactuadas</label><div>${(p.actions||[]).map(a=>'• '+escapeHTML(a)).join('<br>')||'—'}</div></div><br><div class="field"><label>Evolução atual</label><div class="${evolutionClass(f.evolution)}"><b>${escapeHTML(f.evolution||'Sem avaliação')}</b></div></div><br><button class="small-btn" onclick="openPlanModal()">Editar plano</button></div>`}
+function drawerPendencias(f){const ps=f.pending||[];return `<div class="card"><div class="section-title"><h3>Pendências (${ps.filter(p=>!p.done).length} abertas)</h3><button class="small-btn" onclick="openPendingModal()">＋ Nova</button></div>${ps.map(p=>`<div class="pending-item ${p.done?'done':p.priority==='Alta'?'red':''}"><strong>${escapeHTML(p.title)}</strong><small>Prazo: ${formatDate(p.due)} • ${escapeHTML(p.priority||'Média')}</small><div style="margin-top:7px"><button class="small-btn" onclick="togglePending('${p.id}')">${p.done?'Reabrir':'Concluir'}</button></div></div>`).join('')||'<span class="muted">Nenhuma pendência registrada.</span>'}</div>`}
+function setDrawerTab(t){drawerTab=t;renderDrawer()}
+document.getElementById('drawerTabs').addEventListener('click',e=>{const t=e.target.closest('.tab');if(t)setDrawerTab(t.dataset.tab)});
+
+document.getElementById('searchInput').addEventListener('input',renderTable);
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();focusSearch()}if(e.key==='Escape'){closeDrawer()}});
+
+function modal(title,html,onSaveLabel='Salvar'){document.getElementById('modalBox').innerHTML=`<div class="modal-head"><h2>${title}</h2><button class="close" onclick="closeModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-foot"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary" id="modalSave">${onSaveLabel}</button></div>`;document.getElementById('modalBackdrop').classList.add('show')}
+function closeModal(){document.getElementById('modalBackdrop').classList.remove('show')}
+function backdropClose(e){if(e.target.id==='modalBackdrop')closeModal()}
+function requireSelected(){if(!selected()){toast('Selecione uma família na lista primeiro.','warn');return false}return true}
+function togglePaifSelected(){if(!requireSelected())return;const f=selected();f.paifActive=!isPaifFamily(f);if(f.paifActive&&!f.paifStartedAt)f.paifStartedAt=todayISO();if(!f.paifActive)f.paifEndedAt=todayISO();save();render();toast(f.paifActive?'Acompanhamento PAIF marcado como ativo.':'Acompanhamento PAIF marcado como encerrado.','ok')}
+function openStatusModal(){if(!requireSelected())return;const f=selected();const options=['Ativo','Alerta','Bloqueio','Suspensão','Suspensão Temporária','Não informado'];modal('Alterar situação do benefício',`<div class="form-group"><label>Situação atual</label><select id="benefitStatusEdit">${options.map(o=>`<option ${f.benefitStatus===o?'selected':''}>${o}</option>`).join('')}</select></div><p class="muted" style="font-size:11px">Alerta, Bloqueio, Suspensão e Suspensão Temporária são categorias distintas no sistema.</p>`,'Salvar');document.getElementById('modalSave').onclick=()=>{f.benefitStatus=document.getElementById('benefitStatusEdit').value;save();closeModal();render();toast('Situação atualizada.','ok')}}
+function openAttendanceModal(){if(!requireSelected())return;const f=selected();modal('Registrar atendimento',`<div class="form-grid"><div class="form-group"><label>Família</label><input value="${escapeHTML(f.responsible)}" disabled></div><div class="form-group"><label>Data</label><input id="attDate" type="date" value="${todayISO()}"></div><div class="form-group full"><label>Tipo de atendimento</label><select id="attType"><option>Atendimento no CRAS</option><option>Visita domiciliar</option><option>Busca ativa</option><option>Mediação/reavaliação</option><option>Articulação com escola</option><option>Articulação com saúde</option><option>Contato telefônico</option><option>Outro</option></select></div><div class="form-group full"><label>Registro resumido</label><textarea id="attNotes" placeholder="Registre de forma objetiva o que ocorreu, encaminhamentos e combinados."></textarea></div><div class="form-group"><label>Próxima ação</label><input id="attNext" placeholder="Ex.: visita domiciliar"></div><div class="form-group"><label>Data da próxima ação</label><input id="attNextDate" type="date"></div></div>`,'Registrar');document.getElementById('modalSave').onclick=()=>{const date=document.getElementById('attDate').value||todayISO();f.history=f.history||[];f.history.push({date,type:document.getElementById('attType').value,notes:document.getElementById('attNotes').value.trim()});f.lastAttendance=date;const na=document.getElementById('attNext').value.trim();if(na)f.nextAction=na;const nd=document.getElementById('attNextDate').value;if(nd)f.nextActionDate=nd;save();closeModal();render();toast('Atendimento registrado.','ok')}}
+function openPendingModal(){if(!requireSelected())return;const f=selected();modal('Criar pendência',`<div class="form-group"><label>Descrição</label><input id="penTitle" placeholder="Ex.: verificar frequência escolar"></div><div class="form-grid"><div class="form-group"><label>Prazo</label><input id="penDue" type="date"></div><div class="form-group"><label>Prioridade</label><select id="penPriority"><option>Alta</option><option selected>Média</option><option>Baixa</option></select></div></div>`,'Criar');document.getElementById('modalSave').onclick=()=>{const title=document.getElementById('penTitle').value.trim();if(!title)return toast('Informe a descrição da pendência.','warn');f.pending=f.pending||[];f.pending.push({id:uid('p'),title,due:document.getElementById('penDue').value,priority:document.getElementById('penPriority').value,done:false});save();closeModal();render();toast('Pendência criada.','ok')}}
+function openEvolutionModal(){if(!requireSelected())return;const f=selected();modal('Atualizar evolução',`<div class="form-group"><label>Avaliação atual</label><select id="evo"><option ${f.evolution==='Positiva'?'selected':''}>Positiva</option><option ${f.evolution==='Parcial'?'selected':''}>Parcial</option><option ${f.evolution==='Sem mudança'?'selected':''}>Sem mudança</option><option ${f.evolution==='Agravamento'?'selected':''}>Agravamento</option></select></div><div class="form-group"><label>Justificativa / observação técnica</label><textarea id="evoNote" placeholder="Descreva os elementos observados que sustentam a avaliação."></textarea></div>`,'Atualizar');document.getElementById('modalSave').onclick=()=>{f.evolution=document.getElementById('evo').value;const note=document.getElementById('evoNote').value.trim();if(note){f.history=f.history||[];f.history.push({date:todayISO(),type:'Atualização de evolução',notes:note})}save();closeModal();render();toast('Evolução atualizada.','ok')}}
+function openPlanModal(){if(!requireSelected())return;const f=selected(),p=f.plan||{};modal('Editar plano de acompanhamento',`<div class="form-group"><label>Vulnerabilidade(s) a serem trabalhadas</label><textarea id="plV">${escapeHTML(p.vulnerability||'')}</textarea></div><div class="form-group"><label>Objetivo do acompanhamento</label><textarea id="plO">${escapeHTML(p.objective||'')}</textarea></div><div class="form-group"><label>Ações pactuadas — uma por linha</label><textarea id="plA">${escapeHTML((p.actions||[]).join('\n'))}</textarea></div><div class="form-group"><label>Próxima revisão</label><input id="plD" type="date" value="${p.nextReview||''}"></div>`,'Salvar plano');document.getElementById('modalSave').onclick=()=>{f.plan={vulnerability:document.getElementById('plV').value.trim(),objective:document.getElementById('plO').value.trim(),actions:document.getElementById('plA').value.split('\n').map(s=>s.trim()).filter(Boolean),nextReview:document.getElementById('plD').value};save();closeModal();render();toast('Plano atualizado.','ok')}}
+function openMemberModal(){if(!requireSelected())return;const f=selected();modal('Adicionar membro familiar',`<div class="form-grid"><div class="form-group full"><label>Nome</label><input id="memName"></div><div class="form-group"><label>Parentesco</label><input id="memRel" placeholder="Ex.: Filho"></div><div class="form-group"><label>Idade</label><input id="memAge" type="number" min="0"></div><div class="form-group full"><label>Condicionalidade</label><select id="memCond"><option>Cumprida</option><option>Parcialmente cumprida</option><option>Não cumprida</option><option>Não se aplica</option></select></div><div class="form-group full"><label>Observação</label><input id="memNote" placeholder="Ex.: frequência escolar abaixo do exigido"></div></div>`,'Adicionar');document.getElementById('modalSave').onclick=()=>{const name=document.getElementById('memName').value.trim();if(!name)return toast('Informe o nome do membro.','warn');f.members=f.members||[];f.members.push({name,relation:document.getElementById('memRel').value.trim(),age:document.getElementById('memAge').value||'',conditionality:document.getElementById('memCond').value,note:document.getElementById('memNote').value.trim()});save();closeModal();render();toast('Membro adicionado.','ok')}}
+function togglePending(id){const f=selected();const p=(f.pending||[]).find(x=>x.id===id);if(p){p.done=!p.done;save();render()}}
+function openSettingsModal(){modal('Configurações',`<div class="form-grid"><div class="form-group"><label>Nome exibido</label><input id="setName" value="${escapeHTML(settings.name)}"></div><div class="form-group"><label>Função</label><input id="setRole" value="${escapeHTML(settings.role)}"></div><div class="form-group"><label>Dias sem atualização para alerta</label><input id="setDays" type="number" min="1" value="${settings.staleDays}"></div><div class="form-group"><label>Backup</label><div class="small-actions"><button class="small-btn" onclick="exportBackup()">Exportar JSON</button><button class="small-btn" onclick="document.getElementById('backupInput').click()">Importar JSON</button><input id="backupInput" hidden type="file" accept=".json" onchange="importBackup(this.files[0])"></div></div><div class="form-group full"><label>Dados do sistema</label><button class="small-btn danger" onclick="clearAllData()">Limpar todos os dados</button></div></div>`,'Salvar');document.getElementById('modalSave').onclick=()=>{settings.name=document.getElementById('setName').value.trim()||'Técnico CRAS';settings.role=document.getElementById('setRole').value.trim()||'PAIF';settings.staleDays=Math.max(1,Number(document.getElementById('setDays').value)||60);save();closeModal();render();toast('Configurações salvas.','ok')}}
+function clearAllData(){if(!confirm('Limpar todas as famílias, acompanhamentos, pendências e dados do RMA salvos neste navegador? Esta ação não pode ser desfeita sem um backup.'))return;families=[];meta={lastImportIds:[],lastImportAt:null};rmaState={months:{},analysis:[],filesText:'',selectedFiles:[]};selectedId=null;activeFilter='all';mainView='dashboard';save();closeModal();render();toast('Dados locais limpos. O sistema está pronto para uso.','ok')}
+function exportBackup(){const blob=new Blob([JSON.stringify({version:3,exportedAt:new Date().toISOString(),families,settings,meta,rmaState},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`paif-backup-${todayISO()}.json`;a.click();URL.revokeObjectURL(a.href);toast('Backup exportado.','ok')}
+async function importBackup(file){if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.families))throw new Error('Arquivo inválido');families=data.families;settings={...settings,...(data.settings||{})};meta={...meta,...(data.meta||{})};rmaState={...rmaState,...(data.rmaState||{})};save();closeModal();render();toast('Backup importado.','ok')}catch(e){toast('Não foi possível importar o backup.','err')}}
+function toast(msg,type=''){const el=document.createElement('div');el.className='toast '+type;el.textContent=msg;document.getElementById('toastWrap').appendChild(el);setTimeout(()=>el.remove(),3500)}
+
+function normalizeStatus(v=''){const n=normalizeText(v);if((n.includes('susp')&&n.includes('tempor'))||n.includes('interrupcao temporaria'))return 'Suspensão Temporária';if(n.includes('susp'))return 'Suspensão';if(n.includes('bloq'))return 'Bloqueio';if(n.includes('alert')||n.includes('advert'))return 'Alerta';if(n.includes('ativo')||n.includes('regular'))return 'Ativo';return v?String(v).trim():'Não informado'}
+function normalizeConditionality(v=''){const n=normalizeText(v);if(n.includes('nao cumpr')||n.includes('descumpr'))return 'Não cumprida';if(n.includes('parcial'))return 'Parcialmente cumprida';if(n.includes('cumpr'))return 'Cumprida';return v?String(v).trim():'Não informado'}
+const aliases={responsible:['responsavel familiar','responsavel','nome responsavel','nome do responsavel','responsavel pela familia','rf'],cpf:['cpf','cpf responsavel','cpf do responsavel'],nis:['nis','nis responsavel','nis do responsavel'],address:['endereco','logradouro','residencia','endereco completo'],phone:['telefone','celular','contato'],benefit:['beneficio','programa','beneficio recebido'],benefitStatus:['situacao beneficio','situacao do beneficio','status beneficio','status do beneficio','situacao'],conditionality:['condicionalidade','situacao condicionalidade','situacao da condicionalidade','descumprimento'],member:['membro em descumprimento','nome do membro','membro','beneficiario em descumprimento','pessoa em descumprimento'],paifActive:['acompanhamento paif','em acompanhamento paif','paif ativo','no paif']};
+function mapHeaders(headers){const norm=headers.map(h=>normalizeText(h));const out={};for(const [key,names] of Object.entries(aliases)){const i=norm.findIndex(h=>names.some(a=>h===a||h.includes(a)));if(i>=0)out[key]=headers[i]}return out}
+function parseCSV(text){const rows=[];let row=[],cell='',q=false;for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];if(c==='"'){if(q&&n==='"'){cell+='"';i++}else q=!q}else if(c===','&&!q){row.push(cell);cell=''}else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&n==='\n')i++;row.push(cell);if(row.some(x=>String(x).trim()!==''))rows.push(row);row=[];cell=''}else cell+=c}row.push(cell);if(row.some(x=>String(x).trim()!==''))rows.push(row);if(!rows.length)return[];const headers=rows[0];return rows.slice(1).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??''])))}
+function excelSerialToISO(v){if(!v)return'';if(typeof v==='number'&&window.XLSX){const d=XLSX.SSF.parse_date_code(v);if(d)return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`}const s=String(v).trim();const br=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);if(br)return `${br[3]}-${br[2].padStart(2,'0')}-${br[1].padStart(2,'0')}`;if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);return''}
+function parseDelimitedText(text){
+ const lines=String(text||'').replace(/\r/g,'').split('\n').filter(l=>l.trim());if(!lines.length)return[];
+ const candidates=['\t',';',','];let delim=candidates.map(d=>[d,(lines[0].match(new RegExp(d==='\t'?'\\t':d===';'?';':',','g'))||[]).length]).sort((a,b)=>b[1]-a[1])[0];
+ if(!delim||delim[1]<1)return[];delim=delim[0];
+ if(delim===',')return parseCSV(lines.join('\n'));
+ const headers=lines[0].split(delim).map(x=>x.trim());return lines.slice(1).map(line=>{const vals=line.split(delim);return Object.fromEntries(headers.map((h,i)=>[h,(vals[i]||'').trim()]))});
+}
+function parseLabeledText(text){
+ const clean=String(text||'').replace(/\r/g,'\n').replace(/\n{3,}/g,'\n\n').trim();if(!clean)return[];
+ const rawBlocks=clean.split(/\n\s*\n|\n\s*(?:---+|—+|–+)\s*\n/).map(b=>b.trim()).filter(Boolean);
+ const blocks=rawBlocks.length>1?rawBlocks:[clean];const out=[];
+ const defs={responsible:/^(?:respons[aá]vel(?: familiar)?|nome(?: do)? respons[aá]vel|rf)\s*[:\-]\s*(.+)$/im,cpf:/^cpf\s*[:\-]\s*([\d.\-]+)/im,nis:/^nis\s*[:\-]\s*([\d.\-]+)/im,address:/^(?:endere[cç]o|logradouro)\s*[:\-]\s*(.+)$/im,phone:/^(?:telefone|fone|celular|contato)\s*[:\-]\s*(.+)$/im,benefit:/^(?:benef[ií]cio|programa)\s*[:\-]\s*(.+)$/im,benefitStatus:/^(?:situa[cç][aã]o(?: do benef[ií]cio)?|status(?: do benef[ií]cio)?)\s*[:\-]\s*(.+)$/im,conditionality:/^(?:condicionalidade|descumprimento)\s*[:\-]\s*(.+)$/im,member:/^(?:membro(?: em descumprimento)?|pessoa em descumprimento|benefici[aá]rio em descumprimento)\s*[:\-]\s*(.+)$/im,paifActive:/^(?:acompanhamento paif|em acompanhamento paif|paif ativo|no paif)\s*[:\-]\s*(.+)$/im};
+ for(const block of blocks){const r={};for(const [k,rex] of Object.entries(defs)){const mm=block.match(rex);if(mm)r[k]=mm[1].trim()}
+  if(!r.cpf){const mm=block.match(/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/);if(mm)r.cpf=mm[0]}
+  if(!r.nis){const mm=block.match(/(?:\bNIS\b\s*[:\-]?\s*)?(\d{11})\b/i);if(mm&&(!r.cpf||mm[1]!==String(r.cpf).replace(/\D/g,'')))r.nis=mm[1]}
+  if(!r.responsible){const lines=block.split('\n').map(x=>x.trim()).filter(Boolean);const candidate=lines.find(x=>!/:/.test(x)&&/[A-Za-zÀ-ÿ]{3}/.test(x)&&!/^\d/.test(x));if(candidate&&lines.length<=12)r.responsible=candidate}
+  if(r.responsible||r.cpf||r.nis)out.push({'Responsável familiar':r.responsible||'','CPF':r.cpf||'','NIS':r.nis||'','Endereço':r.address||'','Telefone':r.phone||'','Benefício':r.benefit||'','Situação do benefício':r.benefitStatus||'','Condicionalidade':r.conditionality||'','Membro em descumprimento':r.member||'','Acompanhamento PAIF':r.paifActive||''});
+ }
+ return out;
+}
+function recordsFromText(text){const table=parseDelimitedText(text);if(table.length)return table;return parseLabeledText(text)}
+async function extractPdfText(file){
+ if(!window.pdfjsLib)throw new Error('Leitor de PDF indisponível. Conecte-se à internet e tente novamente.');
+ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+ const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;let text='';
+ for(let i=1;i<=pdf.numPages;i++){const page=await pdf.getPage(i);const content=await page.getTextContent();let lastY=null,line=[];for(const item of content.items){const y=item.transform?.[5];if(lastY!==null&&Math.abs(y-lastY)>4){text+=line.join(' ')+'\n';line=[]}line.push(item.str);lastY=y}if(line.length)text+=line.join(' ')+'\n';text+='\n'}return text;
+}
+async function extractDocxText(file){if(!window.mammoth)throw new Error('Leitor de DOCX indisponível.');const res=await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});return res.value||''}
+function importFamilyRecords(records,sourceLabel='arquivo'){
+ if(!records.length)throw new Error('O arquivo não possui registros reconhecíveis.');const headers=Object.keys(records[0]);const map=mapHeaders(headers);if(!map.responsible&&!map.cpf&&!map.nis)throw new Error('Não encontrei Responsável, CPF ou NIS. Em PDF/TXT, use rótulos como “Responsável:”, “CPF:” ou “NIS:”.');
+ const existingByKey=new Map(families.map(f=>[familyKey(f),f]));const newIds=[];let newCount=0,updated=0;for(const r of records){const temp={responsible:map.responsible?r[map.responsible]:'',cpf:map.cpf?r[map.cpf]:'',nis:map.nis?r[map.nis]:'',address:map.address?r[map.address]:'',phone:map.phone?r[map.phone]:'',benefit:map.benefit?r[map.benefit]:'Bolsa Família',benefitStatus:normalizeStatus(map.benefitStatus?r[map.benefitStatus]:''),conditionality:normalizeConditionality(map.conditionality?r[map.conditionality]:''),paifActive:map.paifActive?/^(sim|ativo|true|1|x)$/i.test(String(r[map.paifActive]||'').trim()):false};if(!temp.responsible&&!temp.cpf&&!temp.nis)continue;const key=familyKey(temp);let f=existingByKey.get(key);if(!f){f={id:uid('f'),...temp,createdAt:todayISO(),importSource:sourceLabel,lastAttendance:'',evolution:'Sem avaliação',nextAction:'Realizar triagem',nextActionDate:'',members:[],history:[],plan:{vulnerability:'',objective:'',actions:[],nextReview:''},pending:[]};families.push(f);existingByKey.set(key,f);newIds.push(f.id);newCount++}else{['responsible','cpf','nis','address','phone','benefit'].forEach(k=>{if(temp[k])f[k]=String(temp[k]).trim()});if(temp.benefitStatus&&temp.benefitStatus!=='Não informado')f.benefitStatus=temp.benefitStatus;if(temp.conditionality&&temp.conditionality!=='Não informado')f.conditionality=temp.conditionality;if(map.paifActive)f.paifActive=temp.paifActive;updated++}
+ const member=map.member?String(r[map.member]||'').trim():'';if(member){f.members=f.members||[];if(!f.members.some(m=>normalizeText(m.name)===normalizeText(member)))f.members.push({name:member,relation:'',age:'',conditionality:temp.conditionality||'Não informado',note:`Importado de ${sourceLabel}`})}}
+ meta.lastImportIds=[...new Set(newIds)];meta.lastImportAt=new Date().toISOString();save();activeFilter='new';mainView='familias';render();toast(`Importação concluída: ${newCount} novas e ${updated} atualizadas.`, 'ok');
+}
+async function handleFile(file){
+ try{let records=[];const ext=(file.name.split('.').pop()||'').toLowerCase();if(ext==='csv')records=parseCSV(await file.text());else if(ext==='txt')records=recordsFromText(await file.text());else if(ext==='pdf')records=recordsFromText(await extractPdfText(file));else if(ext==='xlsx'||ext==='xls'){if(!window.XLSX)throw new Error('Biblioteca Excel indisponível. Tente novamente conectado à internet.');const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];records=XLSX.utils.sheet_to_json(ws,{defval:''})}else throw new Error('Formato não suportado. Use Excel, CSV, PDF ou TXT.');
+ importFamilyRecords(records,ext.toUpperCase());
+ }catch(e){console.error(e);toast(e.message||'Erro ao importar o arquivo.','err')}finally{document.getElementById('fileInput').value=''}
+}
+function familyKey(f){const cpf=normalizeText(f.cpf).replace(/\D/g,'');const nis=normalizeText(f.nis).replace(/\D/g,'');if(cpf)return'cpf:'+cpf;if(nis)return'nis:'+nis;return'name:'+normalizeText(f.responsible)}
+
+function rmaPeriod(){const m=document.getElementById('rmaMonth')?.value||String(new Date().getMonth()+1).padStart(2,'0');const y=document.getElementById('rmaYear')?.value||String(new Date().getFullYear());return {m,y,key:`${y}-${m}`}}
+function monthlyPaifData(){const {key}=rmaPeriod();let attendances=0,visits=0,newFamilies=0;const counts={C1:0,C2:0,C3:0,C4:0,C5:0,C6:0};families.forEach(f=>{if(String(f.createdAt||'').startsWith(key))newFamilies++;(f.history||[]).forEach(h=>{if(!String(h.date||'').startsWith(key))return;attendances++;const c=classifyRmaRecord(`${h.type||''}\n${h.notes||''}`);Object.keys(counts).forEach(k=>counts[k]+=c.includes(k)?1:0);if(c.includes('C6'))visits++})});return {families:families.length,attendances,visits,newFamilies,counts}}
+function renderRMA(){if(!document.getElementById('rmaMonth'))return;const now=new Date();if(!document.getElementById('rmaYear').value){document.getElementById('rmaMonth').value=String(now.getMonth()+1).padStart(2,'0');document.getElementById('rmaYear').value=now.getFullYear()}const d=monthlyPaifData();document.getElementById('rmaKpiFamilies').textContent=d.families;document.getElementById('rmaKpiAttendances').textContent=d.attendances;document.getElementById('rmaKpiVisits').textContent=d.visits;document.getElementById('rmaKpiNewFamilies').textContent=d.newFamilies;renderRmaAnalysis()}
+function syncRMAFromPAIF(){const d=monthlyPaifData();document.getElementById('rmaA1').value=d.families;document.getElementById('rmaA2').value=d.newFamilies;['C1','C2','C3','C4','C5','C6'].forEach(k=>document.getElementById('rma'+k).value=d.counts[k]||0);renderRMA();toast('Dados do PAIF sincronizados para conferência no RMA.','ok')}
+function classifyRmaRecord(text){const n=normalizeText(text);const c=[];if(n.length>8)c.push('C1');if(/encaminh.{0,50}(inclus|cadastr).{0,30}(cadunico|cadastro unico)/.test(n)||/(cadunico|cadastro unico).{0,30}(inclus|cadastr)/.test(n))c.push('C2');if(/encaminh.{0,50}(atualiz).{0,30}(cadunico|cadastro unico)/.test(n)||/(cadunico|cadastro unico).{0,30}atualiz/.test(n))c.push('C3');if(/encaminh.{0,45}(bpc|beneficio de prestacao continuada)/.test(n)||/(acesso ao bpc|requerimento do bpc)/.test(n))c.push('C4');if(/encaminh.{0,45}creas/.test(n)||/encaminhamento ao creas/.test(n))c.push('C5');if(/visita domiciliar|visita ao domicilio/.test(n))c.push('C6');return [...new Set(c)]}
+function splitRmaRecords(text){const t=String(text||'').replace(/\r/g,'').trim();if(!t)return[];const byDivider=t.split(/\n\s*(?:---+|—+|–+)\s*\n/).map(x=>x.trim()).filter(Boolean);if(byDivider.length>1)return byDivider;const parts=t.split(/(?=^\s*\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4}\b)/m).map(x=>x.trim()).filter(Boolean);if(parts.length>1)return parts;return t.split(/\n\s*\n+/).map(x=>x.trim()).filter(x=>x.length>8)}
+async function rmaReadFile(file){const ext=(file.name.split('.').pop()||'').toLowerCase();if(ext==='txt')return file.text();if(ext==='pdf')return extractPdfText(file);if(ext==='docx')return extractDocxText(file);throw new Error(`Formato ${ext} não suportado no RMA.`)}
+async function analyzeRmaSources(){try{let text=document.getElementById('rmaManualText').value.trim();for(const f of (rmaState.selectedFiles||[])){text+='\n\n'+await rmaReadFile(f)}const recs=splitRmaRecords(text);if(!recs.length)throw new Error('Nenhum registro foi identificado.');rmaState.analysis=recs.map((raw,i)=>({id:'r'+(i+1),raw,codes:classifyRmaRecord(raw)}));save();renderRmaAnalysis();toast(`${recs.length} registro(s) analisado(s).`,'ok')}catch(e){console.error(e);toast(e.message||'Erro na análise do RMA.','err')}}
+function renderRmaAnalysis(){const box=document.getElementById('rmaAnalysisList');if(!box)return;const arr=rmaState.analysis||[];box.innerHTML=arr.length?arr.map((r,i)=>`<div class="rma-record"><div class="record-head"><strong>Registro ${i+1}</strong>${(r.codes||[]).map(c=>`<span class="record-badge">${c}</span>`).join('')||'<span class="source-format">Revisar</span>'}</div><pre>${escapeHTML(r.raw)}</pre></div>`).join(''):'<span class="muted">Nenhuma análise realizada.</span>';const f=document.getElementById('rmaSelectedFiles');if(f)f.textContent=(rmaState.selectedFiles||[]).length?`${rmaState.selectedFiles.length} arquivo(s) selecionado(s)`:'Nenhum arquivo selecionado'}
+function applyRmaAnalysis(){const arr=rmaState.analysis||[];if(!arr.length)return toast('Faça uma análise antes de aplicar.','warn');const totals={C1:0,C2:0,C3:0,C4:0,C5:0,C6:0};arr.forEach(r=>(r.codes||[]).forEach(c=>{if(c in totals)totals[c]++}));Object.keys(totals).forEach(k=>document.getElementById('rma'+k).value=totals[k]);toast('Pré-análise aplicada ao resumo. Confira os números antes de salvar.','ok')}
+function clearRmaAnalysis(){rmaState.analysis=[];rmaState.selectedFiles=[];document.getElementById('rmaManualText').value='';save();renderRmaAnalysis()}
+function readRmaInputs(){const vals={};['A1','A2','C1','C2','C3','C4','C5','C6'].forEach(k=>vals[k]=Math.max(0,Number(document.getElementById('rma'+k).value)||0));return vals}
+function saveRmaMonth(){const p=rmaPeriod();rmaState.months=rmaState.months||{};rmaState.months[p.key]={period:p.key,values:readRmaInputs(),savedAt:new Date().toISOString(),unit:'CRAS Cristiana Vicente Nunes'};save();toast(`RMA ${p.m}/${p.y} salvo neste navegador.`,'ok')}
+function exportRmaMonth(){const p=rmaPeriod();const payload={period:p.key,unit:{name:'CRAS Cristiana Vicente Nunes',address:'Rua Santo Agostinho, 193 - Centenário, Boa Vista - RR, 69312-490',phone:'(95) 98402-6617'},values:readRmaInputs(),analysis:rmaState.analysis||[],exportedAt:new Date().toISOString()};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`rma-${p.key}.json`;a.click();URL.revokeObjectURL(a.href)}
+
+document.getElementById('fileInput').addEventListener('change',e=>{const file=e.target.files[0];if(file)handleFile(file)});
+document.getElementById('rmaFileInput').addEventListener('change',e=>{rmaState.selectedFiles=Array.from(e.target.files||[]);renderRmaAnalysis()});
+document.getElementById('rmaMonth').addEventListener('change',renderRMA);document.getElementById('rmaYear').addEventListener('change',renderRMA);
+
+load();render();setMainView('dashboard');
+</script>
+</body>
+</html>
