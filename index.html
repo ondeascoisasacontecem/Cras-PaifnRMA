@@ -107,10 +107,11 @@
     .original-note{margin-top:7px;border-top:1px dashed #dfe5ee;padding-top:6px;color:#66738b;font-size:12px}.original-note summary{cursor:pointer;font-weight:750}.original-note pre{white-space:pre-wrap;font:inherit;margin:5px 0 0}
     .orthography-hint{font-size:12px;line-height:1.45;color:#5f6d85;background:#f7f9fc;border:1px solid #e5eaf2;border-radius:9px;padding:8px 10px;margin-top:7px}
     @media(max-width:650px){.history-summary{grid-template-columns:1fr}}
-  </style>
+  #secScreen[hidden],#appRoot[hidden]{display:none!important}\n  </style>
 </head>
 <body>
-<div class="app">
+<div id="secScreen" style="position:fixed;inset:0;z-index:99999;background:#eef3fb;display:grid;place-items:center;padding:20px"><div style="background:white;padding:28px;border-radius:16px;max-width:420px;width:100%;box-shadow:0 10px 40px #1b2a4440"><h2 id="secHeading">Acesso protegido</h2><p style="font-size:13px">Os dados deste navegador serão criptografados. Guarde a senha: não existe recuperação automática.</p><label>Login<input id="secUser" autocomplete="username" style="display:block;width:100%;margin:6px 0 14px;padding:10px"></label><label>Senha<input id="secPassword" type="password" autocomplete="current-password" style="display:block;width:100%;margin:6px 0 14px;padding:10px" onkeydown="if(event.key==='Enter')secOpen()"></label><div id="secConfirmWrap"><label>Confirmar senha<input id="secConfirm" type="password" autocomplete="new-password" style="display:block;width:100%;margin:6px 0 14px;padding:10px"></label></div><button class="btn primary" onclick="secOpen()" style="width:100%">Entrar / Criar acesso</button><p id="secMsg" role="status" style="color:#9c3030;font-size:13px"></p><p style="font-size:12px;color:#555">Bloqueio após 15 minutos de inatividade. Proteção local: não substitui autenticação de servidor.</p></div></div>
+<div class="app" id="appRoot" hidden>
   <aside class="rail">
     <div class="avatar" id="avatar">TC</div>
     <div class="rail-name" id="railName">Técnico CRAS</div>
@@ -125,7 +126,7 @@
       <button class="rail-btn" data-main-view="rma" data-label="RMA" title="Registro Mensal de Atendimentos" onclick="setMainView('rma')">▦</button>
     </nav>
     <div class="rail-spacer"></div>
-    <button class="rail-exit" onclick="exportBackup()">⇩ Backup</button>
+    <button class="rail-exit" onclick="exportBackup()">⇩ Backup</button><button class="rail-exit" onclick="secLock()">Sair</button>
   </aside>
 
   <div class="shell">
@@ -309,7 +310,32 @@ function formatDate(iso){const d=parseLocalDate(iso);return d?d.toLocaleDateStri
 function daysSince(iso){const d=parseLocalDate(iso);if(!d)return 99999;const now=new Date();now.setHours(0,0,0,0);return Math.floor((now-d)/(86400000))}
 function escapeHTML(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c]))}
 function normalizeText(s=''){return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,' ')}
-function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(families));localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));localStorage.setItem(META_KEY,JSON.stringify(meta));localStorage.setItem(RMA_KEY,JSON.stringify({...rmaState,selectedFiles:[]}))}
+
+const SEC_CFG='paif_auth_config_v1',SEC_VAULT='paif_auth_vault_v1',SEC_ITER=250000;
+let secKey=null,secWrite=Promise.resolve(),secIdle=null;
+const secEnc=new TextEncoder(),secDec=new TextDecoder();
+function secB64(a){const b=new Uint8Array(a);let s='';for(let i=0;i<b.length;i+=8192)s+=String.fromCharCode(...b.subarray(i,i+8192));return btoa(s)}
+function secBytes(s){const b=atob(s),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a}
+function secRandom(n){const b=new Uint8Array(n);crypto.getRandomValues(b);return b}
+async function secDerive(password,salt){const k=await crypto.subtle.importKey('raw',secEnc.encode(password),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:SEC_ITER,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function secEncrypt(key,obj){const iv=secRandom(12),bytes=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,secEnc.encode(JSON.stringify(obj)));return {iv:secB64(iv),data:secB64(bytes)}}
+async function secDecrypt(key,obj){return JSON.parse(secDec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:secBytes(obj.iv)},key,secBytes(obj.data))))}
+function secSnapshot(){return {families,settings,meta,rmaState:{...rmaState,selectedFiles:[]}}}
+function secLegacyRemove(){[STORAGE_KEY,SETTINGS_KEY,META_KEY,RMA_KEY].forEach(k=>localStorage.removeItem(k))}
+function secMessage(t){document.getElementById('secMsg').textContent=t}
+async function secPersist(snapshot){if(!secKey)return;const encrypted=await secEncrypt(secKey,snapshot);localStorage.setItem(SEC_VAULT,JSON.stringify(encrypted))}
+function save(){if(!secKey)return Promise.resolve();const snapshot=JSON.parse(JSON.stringify(secSnapshot()));secWrite=secWrite.catch(()=>{}).then(()=>secPersist(snapshot));return secWrite}
+function secActivity(){if(!secKey)return;clearTimeout(secIdle);secIdle=setTimeout(()=>secLock(),900000)}
+function secLock(){secKey=null;location.reload()}
+async function secOpen(){const user=document.getElementById('secUser').value.trim(),password=document.getElementById('secPassword').value;const cfg=JSON.parse(localStorage.getItem(SEC_CFG)||'null');if(!crypto?.subtle)return secMessage('Criptografia indisponível: utilize HTTPS.');if(!user||!password)return secMessage('Informe login e senha.');try{
+ if(!cfg){if(user.length<3||password.length<10)return secMessage('Use login com 3 caracteres e senha com pelo menos 10 caracteres.');const confirmPassword=document.getElementById('secConfirm').value;if(password!==confirmPassword)return secMessage('As senhas não coincidem.');const salt=secRandom(16),key=await secDerive(password,salt),proof=await secEncrypt(key,{ok:true});secKey=key;
+ // Migrate only after successful encrypted write.
+ load();await secPersist(secSnapshot());localStorage.setItem(SEC_CFG,JSON.stringify({user,salt:secB64(salt),proof}));secLegacyRemove();
+ }else{if(user!==cfg.user)throw Error('login');const key=await secDerive(password,secBytes(cfg.salt));const proof=await secDecrypt(key,cfg.proof);if(!proof.ok)throw Error('senha');const payload=await secDecrypt(key,JSON.parse(localStorage.getItem(SEC_VAULT)));secKey=key;families=payload.families||[];settings={...settings,...payload.settings};meta={...meta,...payload.meta};rmaState={...rmaState,...payload.rmaState,selectedFiles:[]};}
+ document.getElementById('secScreen').hidden=true;document.getElementById('appRoot').hidden=false;document.getElementById('secPassword').value='';document.getElementById('secConfirm').value='';render();setMainView('dashboard');secActivity();
+ }catch(e){secKey=null;secMessage('Não foi possível desbloquear. Verifique login, senha e armazenamento local.');console.error(e)}}
+function secInit(){const cfg=JSON.parse(localStorage.getItem(SEC_CFG)||'null');document.getElementById('secConfirmWrap').hidden=!!cfg;document.getElementById('secHeading').textContent=cfg?'Entrar no sistema':'Criar acesso neste dispositivo';if(cfg)document.getElementById('secUser').value=cfg.user;['pointerdown','keydown','touchstart'].forEach(ev=>window.addEventListener(ev,secActivity,{passive:true}));}
+
 function load(){
   try{families=JSON.parse(localStorage.getItem(STORAGE_KEY))||[]}catch{families=[]}
   families=families.map(f=>({...f,paifActive:typeof f.paifActive==='boolean'?f.paifActive:false,nationality:f.nationality||'',sex:f.sex||'',age:f.age||'',rmaProfile:{extremePoverty:false,bolsaFamilia:false,bpc:false,childLabor:false,shelter:false,...(f.rmaProfile||{})},paifPeriods:Array.isArray(f.paifPeriods)?f.paifPeriods:((f.paifStartedAt||f.paifEndedAt)?[{start:f.paifStartedAt||f.createdAt||'',end:f.paifEndedAt||''}]:[]),members:(f.members||[]).map(m=>({...m,nationality:m.nationality||'',sex:m.sex||''})),history:(f.history||[]).map(h=>({...h,id:h.id||uid('h')}))}));
@@ -614,7 +640,7 @@ document.getElementById('fileInput').addEventListener('change',e=>{const file=e.
 document.getElementById('rmaFileInput').addEventListener('change',e=>{rmaState.selectedFiles=Array.from(e.target.files||[]);renderRmaAnalysis()});
 document.getElementById('rmaMonth').addEventListener('change',renderRMA);document.getElementById('rmaYear').addEventListener('change',renderRMA);
 
-load();render();setMainView('dashboard');
+secInit();
 </script>
 </body>
 </html>
